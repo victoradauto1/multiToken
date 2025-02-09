@@ -321,5 +321,15 @@ describe("MultiToken", function () {
       await expect(contract.uri(10)).to.be.revertedWith("This token does not exist");
     });
 
+    it("should initialize correctly", async function () {
+      const { contract, owner, otherAccount } = await loadFixture(
+        deployFixture
+      );
+      expect(await contract.owner()).to.equal(owner.address);  // Verifica se o dono é o deployer
+      expect(await contract.tokenPrice()).to.equal(ethers.parseEther("0.01")); // Verifica o preço do token
+      expect(await contract.maxSupply()).to.equal(50); // Verifica o maxSupply
+      expect(await contract.uri(0)).to.equal("https://crimson-junior-gayal-634.mypinata.cloud/ipfs/0.json"); // Verifica a URI
+  });
+
   });
 });
