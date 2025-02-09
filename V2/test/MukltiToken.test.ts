@@ -1,7 +1,8 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import hre, { ethers } from "hardhat";
-import { erc1155 } from "../typechain-types/@openzeppelin/contracts/token";
+import hre, { ethers, upgrades } from "hardhat";
+import { MultiToken } from "../typechain-types";
+
 
 describe("MultiToken", function () {
   // We define a fixture to reuse the same setup in every test.
@@ -12,9 +13,10 @@ describe("MultiToken", function () {
     const [owner, otherAccount] = await hre.ethers.getSigners();
 
     const MultiToken = await hre.ethers.getContractFactory("MultiToken");
-    const contract = await MultiToken.deploy();
+    const contract = await upgrades.deployProxy(MultiToken);
+    const contractAddress = await contract.getAddress();
 
-    return { contract, owner, otherAccount };
+    return { contract, contractAddress, owner, otherAccount };
   }
 
   describe("Deployment", function () {
@@ -24,12 +26,9 @@ describe("MultiToken", function () {
       );
 
       await contract.mint(0, { value: ethers.parseEther("0.01") });
-
       const balance = await contract.balanceOf(owner, 0);
-      const supply = await contract.currentSupply(0);
 
       expect(balance).to.equal(1, "cannot mint");
-      expect(supply).to.equal(49, "cannot mint");
     });
 
     it("Should NOT mint (exists)", async function () {
@@ -74,10 +73,8 @@ describe("MultiToken", function () {
       await contract.burn(owner, 0, 1);
 
       const balance = await contract.balanceOf(owner, 0);
-      const supply = await contract.currentSupply(0);
 
       expect(balance).to.equal(0, "Cannot burn");
-      expect(supply).to.equal(49, "Cannot burn");
     });
 
     it("Should burn (approved)", async function () {
@@ -90,15 +87,13 @@ describe("MultiToken", function () {
       await contract.setApprovalForAll(otherAccount, true);
 
       const approved = await contract.isApprovedForAll(owner, otherAccount);
-      const instance = contract.connect(otherAccount);
+      const instance = contract.connect(otherAccount) as MultiToken;
       await instance.burn(owner, 0, 1);
 
       const balance = await contract.balanceOf(owner, 0);
-      const supply = await contract.currentSupply(0);
 
       expect(approved).to.equal(true, "Cannot burn(approved)");
       expect(balance).to.equal(0, "Cannot burn(approved)");
-      expect(supply).to.equal(49, "Cannot burn(approved)");
     });
 
     it("Should NOT burn (balance)", async function () {
@@ -119,7 +114,7 @@ describe("MultiToken", function () {
 
       await contract.mint(0, { value: ethers.parseEther("0.01") });
 
-      const instance = contract.connect(otherAccount);
+      const instance = contract.connect(otherAccount) as MultiToken;
       await expect(instance.burn(owner, 0, 1)).to.be.revertedWithCustomError(
         contract,
         "ERC1155MissingApprovalForAll"
@@ -145,11 +140,9 @@ describe("MultiToken", function () {
         [owner, otherAccount],
         [0, 0]
       );
-      const supply = await contract.currentSupply(0);
 
-      expect(balance[0]).to.equal(0, "Cannot Safe Trans");
-      expect(balance[1]).to.equal(1, "Cannot Safe Trans");
-      expect(supply).to.equal(49, "Cannot Safe Trans");
+      expect(balance[0]).to.equal(0, "Cannot Safe Transfer");
+      expect(balance[1]).to.equal(1, "Cannot Safe Transfer");
     });
 
     it("Should emit transfer", async function () {
@@ -207,7 +200,7 @@ describe("MultiToken", function () {
         deployFixture
       );
 
-      const instance = contract.connect(otherAccount);
+      const instance = contract.connect(otherAccount) as MultiToken;
 
       await expect(instance.safeTransferFrom(
         owner,
@@ -260,7 +253,7 @@ describe("MultiToken", function () {
       await contract.mint(0, { value: ethers.parseEther("0.01") });
       await contract.mint(1, { value: ethers.parseEther("0.01") });
 
-      const instance = contract.connect(otherAccount);
+      const instance = contract.connect(otherAccount) as MultiToken;
       await expect(instance.safeBatchTransferFrom(
         owner,
         otherAccount,
@@ -284,7 +277,7 @@ describe("MultiToken", function () {
         deployFixture
       );
       
-      const instance = contract.connect(otherAccount);
+      const instance = contract.connect(otherAccount) as MultiToken;
       await instance.mint(0, { value: ethers.parseEther("0.01") });
 
       const balanceContractBefore = await ethers.provider.getBalance(contract);
@@ -305,9 +298,9 @@ describe("MultiToken", function () {
         deployFixture
       );
 
-      const instance = contract.connect(otherAccount);
+      const instance = contract.connect(otherAccount) as MultiToken;
 
-      await expect(instance.withDraw()).to.be.revertedWith("You do not have permission");
+      await expect(instance.withDraw()).to.be.revertedWithCustomError(contract, "OwnableUnauthorizedAccount");
     });
 
     it("Should has uri metadata", async function () {
